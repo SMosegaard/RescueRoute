@@ -1,0 +1,479 @@
+---
+title: "Spatial Analysis"
+author: "Sofie Mosegaard"
+---
+
+
+### Load Packages ### 
+
+# Packages
+```{r}
+pacman::p_load(mapboxapi,
+               leaflet,
+               tidyverse,
+               sf,
+               mapview,
+               ggplot2,
+               opencage,
+               mapboxapi)
+```
+
+```{r}
+pacman::p_load(knitr, rmdformats, Rcpp, fasterize, mapboxapi, leaflet, tidyverse, sf, mapview, ggplot2, opencage, mapboxapi)
+
+options(max.print = "75")
+opts_chunk$set(echo = TRUE,
+	             cache = TRUE,
+               prompt = FALSE,
+               tidy = TRUE,
+               comment = NA,
+               message = FALSE,
+               warning = FALSE)
+opts_knit$set(width = 75)
+```
+
+# Connect to MapboxAPI and Opencage API
+```{r}
+
+mb_token <- "MY TOKEN"
+mb_access_token(mb_token, install = TRUE, overwrite = TRUE)
+
+Sys.setenv(OPENCAGE_KEY = "YOUR KEY")
+
+```
+
+# Create a basemap using Mapbox
+```{r}
+
+mapbox_map <- leaflet() %>%
+  addMapboxTiles(style_id = "streets-v11",
+                 username = "mapbox") 
+
+```
+
+
+### Load Data ### 
+
+# Load data about regions and municipalities
+```{r}
+municipalities <- readRDS("../data/municipalities.rds")
+```
+
+
+### Generate Data ### 
+
+# Geocode a dataset with vector of all hospital addresses in all five regions today
+```{r}
+nord_hospitals <- c("Aalborg Universitetshospital", "Regionshospital Nordjylland, Hjørring", "Regionshospital Nordjylland, Frederikshavn", "Aalborg Universitetshospital Farsø", "Aalborg Universitetshospital Hobro")
+
+midt_hospitals <- c("Regionshospitalet Gødstrup", "Regionshospitalet Horsens", "Regionshospitalet Lemvig", "Regionshospitalet Randers", "Regionshospitalet Silkeborg", "Skive Sygehus", "Regionshospitalet Viborg", "Aarhus Universitetshospital")
+
+syd_hospitals <- c("Esbjerg Sygehus", "Grindsted Sygehus", "Brørup Sygehus", "Aabenraa Sygehus", "Sønderborg Sygehus", "Tønder Sygehus", "Kolding Sygehus", "Middelfart Sygehus", "Vejle Sygehus", "Odense universitetshospital", "Svendborg Sygehus", "Sygehus Nyborg", "Ærø Ærøskøbing")
+
+sjælland_hospitals <- c("Holbæk Sygehus", "Nykøbing Falster Sygehus", "Næstved Sygehus", "Slagelse Sygehus", "Ringsted Sygehus", "Sjællands Universitetshospital Køge", "Sjællands Universitetshospital Roskilde")
+
+hovedstad_hospitals <- c("Amager Hospital - Italiensvej", "Bispebjerg Hospital", "Bornholms hospital", "Frederiksberg Hospital", "Gentofte Hospital", "Hvidovre Hospital", "Hillerød Hospital", "Nordsjællands Hospital – Frederikssund", "Rigshospitalet", "Rigshospital Glostrup", "Helsingør Sundhedshus")
+```
+
+# Geocode a additional vector of hospital addresses before the centralization
+```{r}
+
+hospitals_before_centralization <- c("Nørregade 19, 9330 Dronninglund", "Sygehusvej 6, 9460 Brovst", "Hadsundvej 32, 9575 Terndrup", "Toftegade 23 7900 Nykøbing mors", "Grenaa Sundhedshus", "Vestergade 23, 8620 Kjellerup", "Randlevvej 2, 8300 Odder", "Agerbølvej 2, 7323 Give", "Skolegade 12A, 6650 Brørup", "Skallebækvej 7, 6100 Haderslev", "Fredericia Sundhedshus, Dronningensgade", "Rolighedsvej 9, 5400 Bogense", "Kirkestræde 11, 5600 Faaborg", "Lindevej 5, 5750 Ringe", "Sygehusvej 4, 3230 Græsted", "Nørre Alle 27, 4400 Kalundborg", "Quistgaardsvej 2, 4220 Korsør", "Vordingborg Sundhedscenter", "Søndre Boulevard 84, 4930 Maribo", "Stege Sundhedscenter", "Hoskiærsvej 17, 4900 Nakskov", "Sygehusvej 20, 8740 Brædstrup", "Sygehusvej 7, 8660 Skanderborg", "Østergade 30, 7620 Lemvig", "Samsø Sundheds- og Akuthus, Søtofte", "Kirkegade 3, 6880 Tarm", "Usserød Kongevej 102, 2970 Hørsholm", "Hans Bogbinders Allé 3, 2300 København S")
+
+```
+
+# Geocode ambulance bases for all five regions
+```{r}
+
+nord_bases <- c("Sdr Omfartsvej 1, 9700 Brønderslev", "Slotsgade 38, 9330 Dronninglund", "H.C. Ørsteds Vej 35, 9900 Frederikshavn", "Frederikshavnsvej 33, 9800 Hjørring", "Byrum Hovedgade 19A, 9940 Læsø", "Industrivej 9, 9480 Løkken", "Søndergade 47, 9240 Nibe", "Bouet Møllevej 16, 9400 Nørresundby", "Stormgade 4, 9490 Pandrup", "Kattegatvej 3, 9990 Skagen", "Ålborgvej 95, 9300 Sæby", "Håndværkervej 27, 9000 Aalborg", "Stationsvej 20, 9460 Brovst", "Søndergården 4, 9640 Farsø", "Mågevej 14, 9690 Fjerritslev", "Østergade 70, 9560 Hadsund", "Sjællandsvej 9, 9500 Hobro", "Industrivej 14, 7760 Hurup", "Aarsvej 5, 9670 Løgstør", "Elsøvej 107, 7900 Nykøbing", "Vestre Primærvej 9, 9530 Støvring", "Mølledamsvej 8, 9575 Terndrup", "Fabriksvej 4, 7700 Thisted", "Rævebakken 5, 7752 Snedsted", "Industrivej 52, 9600 Aars")
+
+midt_bases <- c("A L Pedersensvej 3, 8961 Allingåbro", "Industrivej Syd 1, 7490 Aulum", "Søndergade 13b, 7860 Spøttrup", "Vestergade 101, 8850 Bjerringbro", "Brandlundvej 25, 7330 Brande", "Vestervangen 5G, 8740 Brædstrup", "Vilholmvej 4A, 7870 Roslev", "Falcksvej 1, 8400 Ebeltoft", "Marktoften 1, 8464 Galten", "Hadsundvej 551, 8983 Gjerlev", "Gammel Horsensvej 403, 8660 Skanderborg", "Laenvej 29-31, 8585 Glesborg", "Sundhedshuset, Kløvervang 69-71, 8500 Grenå", "Ginneruplundvej 1, 8370 Hadsten", "Ny Tilemannsvej 2, 8450 Hammel", "Lundagervej 16b, 8722 Hedensted", "H.P. Hansens Vej 112, 7400 Herning", "Knudsvej 2, 7400 Herning", "Samsøvej 2, 8382 Hinnerup", "Sundhedshuset, Stationsvej 31, 7500 Holstebro", "Frøjkvej 2, 7500 Holstebro", "Borupvej 2, 8543 Hornslet", "Søndergade 18, 8783 Hornsyld", "Sverigesvej 17C, 8700 Horsens", "Nørregade 84, 6960 Hvide Sande", "Kirkegade 104, 7430 Ikast", "Gammelgårdsvej 6, 7130 Juelsminde", "Gl. Banevej 19, 7470 Karup J", "Søndergade 69, 8620 Kjellerup", "Romlehøjvej 5, 8560 Kolind", "Væthvej 2, 8870 Langå", "Vangevej 8, 7629 Lemvig", "Falkevej 2, 8766 Nørre Snede", "Rønhøjvej 7, 8300 Odder", "Skovlyvej 15, 8930 Randers NØ", "Ribevej 3, 8940 Randers SV", "Vester Strandsbjerg 25, 6950 Ringkøbing", "Sundhedshuset, Nørreport 18, 6950 Ringkøbing", "Brunhøjvej 13, 8680 Ry", "Bækkelundsvej 2, 8410 Rønde", "Kejlstrupvej 99D, 8600 Silkeborg", "Vestergade 131, 8660 Skanderborg", "Engvej 4-6, 7800 Skive", "Bredgade 71, 7600 Struer", "Bjergvej 24, 7280 Sdr. Felding", "Nørremarksvej 2, 6880 Tarm", "Industrivej 25, 8305 Samsø", "Torstedvej 4-8, 6990 Ulfborg", "Fabrikvej 5, 8800 Viborg", "Nygade 8, 6920 Videbæk", "Nr. Bjertvej 17, 7830 Vinderup", "Korshøjvej 2, 8600 Silkeborg", "Ny Munkegade 15, 8000 Aarhus C", "Olof Palmes Allé 32, 8200 Aarhus N", "Stokagervej 8A, 8240 Risskov", "Søren Nymarksvej 6 W, 8270 Højbjerg", "Bautavej 5, 8210 Aarhus V")
+
+syd_bases <- c("Holmelund 32, 5560 Aarup", "Fåborgvej 16, 5610 Assens", "Sjællandsvej 2, 5400 Bogense", "Sivlandsvænget 15, 5260 Odense S", "Markedspladsen 15, st. tv., 5600 Fåborg", "Fredensvej 36, 5620 Glamsbjerg", "Strandvangen 3, 5300 Kerteminde", "Ladegårdsvej 4, 5800 Nyborg", "Kildemosevej 15, 5000 Odense C", "Strandvejen 55, 5450 Otterup", "Selagervej 1, 5750 Ringe", "Ellehaven 4F, 5900 Rudkøbing", "Sallinge Ågade 20, 5750 Ringe", "Grønnemosevej 9, 5700 Svendborg", "Dunkærgade 18, 5970 Ærøskøbing", "Nørremarken 3, 6753 Agerbæk", "Industrivej 52, 6740 Bramming", "Falkevej 14, 6705 Esbjerg Ø", "Vestergade 27, 6670 Holsted", "Sønder Nytoft 19, 6720 Fanø", "Byagervej 4, 6830 Nr. Nebel", "Strandvejen 1A, 6840 Oksbøl", "Ørstedsvej 43, 6760 Ribe", "Louisevej 13, 6630 Rødding", "Billund Lufthavn, Stratusvej, 7190 Billund", "Odinsvej 9, 7200 Grindsted", "Nordre Boulevard 73, 6800 Varde", "Industrivej 3, 6870 Ølgod", "Baungårdsvej 65, 6600 Vejen", "Pilemosen 19, 6200 Aabenraa", "Søndervang 19, 6780 Skærbæk", "Norgesvej 2, 6100 Haderslev", "Skovglimt 6, 6340 Kruså", "Aabenraavej 41, 6240 Løgumkloster", "Ingolf Nielsens vej 14, 6400 Sønderborg", "Højskolevej 1, 6360 Tinglev", "Ærøvej 2, 6520 Toftlund", "Nordre Industrivej 5A, 6270 Tønder", "Tingvejen 30B, 6500 Vojens")
+
+sjælland_bases <- c("Køgevej 2B, 4640 Faxe", "Lunikvej 4, 2670 Greve", "Grønlandsgade 10, 4690 Haslev", "Horseager 5, 4330 Hvalsø", "Industrivej 24, 4652 Hårlev", "Rødbyvej 4, 4930 Maribo", "Maribovej 31, 4900 Nakskov", "Kringelborg Allé 2, 4800 Nykøbing Falster", "Rigavej 4, 4840 Nørre Alslev", "Lindevej 17A, 4720 Præstø", "Industriparken 15, 4100 Ringsted", "Snedkervej 7, 4990 Sakskøbing", "Pilevej 5, 4780 Stege", "Nørregade 20, 4660 Store Heddinge", "Kildemarksvej 2, 4760 Vordingborg", "Nygade 15, 4550 Asnæs", "Kalundborgvej 15, 4460 Snertinge","Birkevej 20, 4291 Ruds-Vedby", "Vesterlyngvej 18, 4500 Nykøbing Sjælland", "Vintapperbuen 2, 4070 Kirke Hyllinge", "Færgevej 68, 3600 Frederikssund", "L. C. Worsøesvej 6, 4300 Holbæk", "Stejlhøj 9, 4400 Kalundborg", "Antvorskov Alle 135, 4200 Slagelse", "Reskavej 11, 4220 Korsør", "Byledet 66, 4600 Køge")
+
+hovedstad_bases <- c("Stæremosen 2, 3250 Gilleleje", "Klostermosevej 106C, 3000 Helsingør", "Frederiksborgvej 50, 3200 Helsinge", "Heimdalsvej 1, 3400 Hillerød", "Hundestedvej 6, 3300 Frederiksværk", "Hovedgaden 71, 3630 Jægerspris", "Færgevej 68, 3600 Frederikssund", "Frydensbergvej 5, 3660 Stenløse", "Ryttermarken 13, 3520 Farum", "Gl Rådhusvej 86, 2750 Ballerup", "Vandtårnsvej 59, 2860 Søborg", "Bernstorffsvej 159, 2900 Hellerup", "Øtoftegårdsvej 4, 2630 Taastrup", "Avedøre Havnevej 37, 2650 Hvidovre", "Nordre Fasanvej 209, 2000 Frederiksberg", "Hvidovrevej 9, 2610 Rødovre", "Ved Lunden 9, 3700 Rønne", "Industrivej 4, 3782 Klemensker", "Falckvej 2, 3730 Nexø")
+
+```
+
+# Forward the geocodings to latitude and longitude tuples:
+```{r}
+
+nord_hospitals_df <- oc_forward_df(placename = nord_hospitals,
+                                   countrycode = "DK")
+
+midt_hospitals_df <- oc_forward_df(placename = midt_hospitals,
+                                   countrycode = "DK")
+
+syd_hospitals_df <- oc_forward_df(placename = syd_hospitals,
+                                  countrycode = "DK")
+
+sjælland_hospitals_df <- oc_forward_df(placename = sjælland_hospitals,
+                                       countrycode = "DK")
+
+hovedstad_hospitals_df <- oc_forward_df(placename = hovedstad_hospitals,
+                                        countrycode = "DK")
+
+hospitals_before_centralization_df <- oc_forward_df(placename = hospitals_before_centralization, countrycode = "DK")
+
+nord_bases_df <- oc_forward_df(placename = nord_bases,
+                               countrycode = "DK")
+
+midt_bases_df <- oc_forward_df(placename = midt_bases,
+                               countrycode = "DK")
+
+syd_bases_df <- oc_forward_df(placename = syd_bases,
+                              countrycode = "DK")
+
+sjælland_bases_df <- oc_forward_df(placename = sjælland_bases,
+                                   countrycode = "DK")
+
+hovedstad_bases_df <- oc_forward_df(placename = hovedstad_bases,
+                                    countrycode = "DK")
+
+```
+
+# Forward the geocodings to latitude and longitude tuples and save the
+dataframes in.csv format in the 'data' folder.
+```{r}
+
+all_hospitals_before <- rbind(nord_hospitals_df,
+                              midt_hospitals_df,
+                              syd_hospitals_df,
+                              sjælland_hospitals_df,
+                              hovedstad_hospitals_df,
+                              hospitals_before_centralization_df)
+
+write_csv(all_hospitals_before, "../data/all_hospitals_before.csv")
+#all_hospitals_before <- read_csv("../data/all_hospitals_before.csv", show_col_types = FALSE)
+
+
+all_hospitals_after <- rbind(nord_hospitals_df,
+                             midt_hospitals_df,
+                             syd_hospitals_df,
+                             sjælland_hospitals_df,
+                             hovedstad_hospitals_df)
+
+write_csv(all_hospitals_after, "../data/all_hospitals.csv")
+#all_hospitals_after <- read_csv("../data/all_hospitals.csv", show_col_types = FALSE)
+
+all_bases <- rbind(midt_bases_df,
+                   nord_bases_df,
+                   syd_bases_df,
+                   sjælland_bases_df,
+                   hovedstad_bases_df)
+
+write_csv(all_bases, "../data/all_bases.csv")
+#all_bases <- read_csv("../data/all_bases.csv", show_col_types = FALSE)
+
+```
+
+# Inspect map of all hospitals before and after the centralization, as well as all ambulance bases
+```{r}
+
+leaflet() %>% 
+  addTiles() %>% 
+  addMarkers(all_hospitals_before$oc_lng,
+             all_hospitals_before$oc_lat,
+             popup = all_hospitals_before$oc_formatted)
+
+leaflet() %>% 
+  addTiles() %>% 
+  addMarkers(all_hospitals_after$oc_lng,
+             all_hospitals_after$oc_lat,
+             popup = all_hospitals_after$oc_formatted)
+
+leaflet() %>% 
+  addTiles() %>% 
+  addMarkers(all_bases$oc_lng,
+             all_bases$oc_lat,
+             popup = all_bases$oc_formatted)
+
+```
+
+
+### Data Transformations and Manipulations ### 
+
+# Convert all data to sf objects with the coordinate reference system 4326
+```{r}
+
+all_hospitals_before_sf <- st_as_sf(all_hospitals_before, coords = c("oc_lng", "oc_lat"),
+                                    crs = 4326)
+
+all_hospitals_after_sf <- st_as_sf(all_hospitals_after, coords = c("oc_lng", "oc_lat"),
+                                   crs = 4326)
+
+all_bases_sf <- st_as_sf(all_bases, coords = c("oc_lng", "oc_lat"),
+                         crs = 4326)
+
+municipalities <- as(municipalities, "sf")
+```
+
+
+### Generate Isochrones ### 
+
+# Generate isochrones around the hospitals using Mapbox with a continious 30-min drive-time profile. The isochrones objects are for plotting purposes only.
+```{r}
+
+all_hospitals_before_continious_iso <- mb_isochrone(all_hospitals_before_sf,
+                                  profile = "driving",
+                                  time = 1:30,
+                                  id = "placename")
+
+all_hospitals_after_continious_iso <- mb_isochrone(all_hospitals_after_sf,
+                                  profile = "driving",
+                                  time = 1:30,
+                                  id = "placename")
+```
+
+# Generate isochrones around the hospitals using Mapbox with a 15-min and 30-min drive-time profile. The isochrones objects are saved in the 'data' folder.
+```{r}
+
+all_hospitals_before_iso_30 <- mb_isochrone(all_hospitals_before_sf,
+                             profile = "driving",
+                             time = 30,
+                             id = "placename")
+
+write_sf(all_hospitals_before_iso_30, "../data/isochrones/all_hospitals_before_iso_30.shp")
+#all_hospitals_before_iso_30 <- read_sf("../data/isochrones/all_hospitals_before_iso_30.shp")
+
+all_hospitals_before_iso_15 <- mb_isochrone(all_hospitals_before_sf,
+                             profile = "driving",
+                             time = 15,
+                             id = "placename")
+
+write_sf(all_hospitals_before_iso_15, "../data/isochrones/all_hospitals_before_iso_15.shp")
+#all_hospitals_before_iso_15 <- read_sf("../data/isochrones/all_hospitals_before_iso_15.shp")
+
+all_hospitals_after_iso_30 <- mb_isochrone(all_hospitals_after_sf,
+                             profile = "driving",
+                             time = 30,
+                             id = "placename")
+
+write_sf(all_hospitals_after_iso_30, "../data/isochrones/all_hospitals_after_iso_30.shp")
+#all_hospitals_after_iso_30 <- read_sf("../data/isochrones/all_hospitals_after_iso_30.shp")
+
+all_hospitals_after_iso_15 <- mb_isochrone(all_hospitals_after_sf,
+                             profile = "driving",
+                             time = 15,
+                             id = "placename")
+
+write_sf(all_hospitals_after_iso_15, "../data/isochrones/all_hospitals_after_iso_15.shp")
+#all_hospitals_iso_15 <- read_sf("../data/isochrones/all_hospitals_after_iso_15.shp")
+
+```
+
+# Generate a isochrone around the ambulance bases using Mapbox with a continious 30-min drive-time profile. The isochrones objects are for plotting purposes only.
+```{r}
+
+all_bases_continious_iso <- mb_isochrone(all_bases_sf,
+                                  profile = "driving",
+                                  time = 1:30,
+                                  id = "placename")
+```
+
+# Generate isochrones around the ambulance bases using Mapbox with a 15-min and 30-min drive-time profile. The isochrones objects are saved in the 'data' folder.
+```{r}
+
+all_bases_iso_30 <- mb_isochrone(all_bases_sf, profile = "driving", 
+                               time = 30,
+                               id = "placename")
+
+write_sf(all_bases_iso_30, "../data/isochrones/all_bases_iso_30.shp")
+#all_bases_iso_30 <- read_sf("../data/isochrones/all_bases_iso_30.shp")
+
+all_bases_iso_15 <- mb_isochrone(all_bases_sf, profile = "driving", 
+                               time = 15,
+                               id = "placename")
+
+write_sf(all_bases_iso_15, "../data/isochrones/all_bases_iso_15.shp")
+#all_bases_iso_15 <- read_sf("../data/isochrones/all_bases_iso_15.shp")
+
+```
+
+### Data Inspection ### 
+
+# Inspect continious drive-time around all hospitals in Denmark before and after the centralization
+```{r}
+
+pal <- colorNumeric("viridis", all_hospitals_before_continious_iso$time, na.color = "transparent")
+
+mapbox_map %>%
+  addPolygons(data = all_hospitals_before_continious_iso,
+              stroke = FALSE,
+              fillColor = ~pal(time),
+              fillOpacity = 0.1) %>%
+  addLegend(values = all_hospitals_before_continious_iso$time,
+            pal = pal,
+            title = "Drive-time to hospitals before centralization")
+
+
+pal <- colorNumeric("viridis", all_hospitals_after_continious_iso$time, na.color = "transparent")
+
+mapbox_map %>%
+  addPolygons(data = all_hospitals_after_continious_iso,
+              stroke = FALSE,
+              fillColor = ~pal(time),
+              fillOpacity = 0.1) %>%
+  addLegend(values = all_hospitals_after_continious_iso$time,
+            pal = pal,
+            title = "Drive-time to hospitals after centralization")
+
+
+pal <- colorNumeric("viridis", all_bases_continious_iso$time, na.color = "transparent")
+
+mapbox_map %>%
+  addPolygons(data = all_bases_continious_iso,
+              stroke = FALSE,
+              fillColor = ~pal(time),
+              fillOpacity = 0.1) %>%
+  addLegend(values = all_bases_continious_iso$time,
+            pal = pal,
+            title = "Drive-time to ambulance bases")
+```
+
+# Inspect regions by municipality
+```{r}
+municipalities %>% 
+  mapview(zcol = "NAME_1")
+```
+
+
+### Risk assessment ###
+
+# Identify risk areas outside the isochrones of 30-min drive-time to hospitals (before and after)
+```{r}
+all_hospitals_before_union_30 <- municipalities %>%
+  st_union() %>%
+  st_difference(st_union(all_hospitals_before_iso_30))
+
+plot(st_geometry(municipalities))
+plot(st_geometry(all_hospitals_before_union_30), add = TRUE, col = "red", alpha = 0.5)
+
+all_hospitals_after_union_30 <- municipalities %>%
+  st_union() %>%
+  st_difference(st_union(all_hospitals_after_iso_30))
+
+plot(st_geometry(municipalities))
+plot(st_geometry(all_hospitals_after_union_30), add = TRUE, col = "red", alpha = 0.5)
+```
+
+# Assess new risk areas that have emerged after centralization
+```{r}
+new_risk_areas_hospitals_30 <- st_difference(all_hospitals_after_union_30, all_hospitals_before_union_30)
+```
+
+```{r}
+
+ggplot() +
+  geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
+  geom_sf(data = new_risk_areas_hospitals_30, fill = "red", color = NA, alpha = 1) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10)) +
+  labs(
+    title = "Regions Beyond 30-Minute Drive to Hospital Post Centralization",
+    subtitle = "New Risk Zones Identified")
+```
+
+# Identify risk areas outside the isochrones of 15-min drive-time to hospitals (before and after)
+```{r}
+all_hospitals_before_union_15 <- municipalities %>%
+  st_union() %>%
+  st_difference(st_union(all_hospitals_before_iso_15))
+
+plot(st_geometry(municipalities))
+plot(st_geometry(all_hospitals_before_union_15), add = TRUE, col = "red", alpha = 0.5)
+
+all_hospitals_after_union_15 <- municipalities %>%
+  st_union() %>%
+  st_difference(st_union(all_hospitals_after_iso_15))
+
+plot(st_geometry(municipalities))
+plot(st_geometry(all_hospitals_after_union_15), add = TRUE, col = "red", alpha = 0.5)
+```
+
+# Assess new risk areas that have emerged after centralization
+```{r}
+new_risk_areas_hospitals_15 <- st_difference(all_hospitals_after_union_15, all_hospitals_before_union_15)
+```
+
+```{r}
+
+ggplot() +
+  geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
+  geom_sf(data = new_risk_areas_hospitals_15, fill = "red", color = NA, alpha = 1) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10)) +
+  labs(
+    title = "Regions Beyond 15-Minute Drive to Hospital Post Centralization",
+    subtitle = "New Risk Zones Identified")
+
+```
+
+# Identify risk areas outside the isochrones of 30-min drive-time to both ambulance bases and hotpitals
+```{r}
+
+all_bases_30_union <- municipalities %>%
+  st_union() %>%
+  st_difference(st_union(all_bases_iso_30))
+
+risk_areas_30 <- st_intersection(all_hospitals_after_union_30, all_bases_30_union)
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
+  geom_sf(data = risk_areas_30, fill = "red", color = NA, alpha = 1) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10)
+  ) +
+  labs(
+    title = "Risk Areas Outside 30-Minute Drive from Hospital or Ambulance Base",
+    subtitle = "Identified Risk Zones"
+  )
+```
+
+# Identify risk areas outside the isochrones of 15-min drive-time to both ambulance bases and hotpitals
+
+```{r}
+all_bases_iso_15 <- st_make_valid(all_bases_iso_15)
+
+all_bases_15_union <- municipalities %>%
+  st_union() %>%
+  st_difference(st_union(all_bases_iso_15))
+
+risk_areas_15 <- st_intersection(all_hospitals_after_union_15, all_bases_15_union)
+
+```
+
+```{r}
+ggplot() +
+  geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
+  geom_sf(data = risk_areas_15, fill = "red", color = NA, alpha = 1) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 11, face = "bold"),
+    plot.subtitle = element_text(hjust = 0.5, size = 10)
+  ) +
+  labs(
+    title = "Risk Areas Outside 15-Minute Drive from Hospital or Ambulance Base",
+    subtitle = "Identified Risk Zones"
+  )
+```
+
+
+
+
+
+
+
+
+
+
