@@ -9,13 +9,17 @@ pacman::p_load(tidyverse, shiny, leaflet, mapboxapi, sf, fontawesome, waiter)
 
 ####### Insert Mapbox token #######
 
-token <- "MY_TOKEN"
+readRenviron(".Renviron")
+token <- Sys.getenv("MAPBOX_TOKEN")
 
+if (token == "") {
+  stop("Mapbox token not found. Please set the MAPBOX_TOKEN environment variable.")
+}
 
 ####### Load data #######
 
-all_bases <- read_csv("../data/all_bases.csv")
-all_hospitals <- read_csv("../data/all_hospitals.csv")
+all_bases <- read_csv("data/all_bases.csv", show_col_types = FALSE)
+all_hospitals <- read_csv("data/all_hospitals.csv", show_col_types = FALSE)
 
 
 ####### Convert data to sf objects #######
@@ -194,7 +198,6 @@ server <- function(input, output) {
         clearShapes() %>%
         addPolylines(data = route_to_user, color = "blue", opacity = 1, weight = 4, group = "Route to User") %>%
         addPolylines(data = route_to_hospital, color = "red", opacity = 1, weight = 4, group = "Route to Hospital") %>%
-        addCircleMarkers(data = all_bases_sf, color = "blue", radius = 5, popup = ~paste("Ambulance Base:", placename)) %>%
         flyTo(lng = st_coordinates(nearest_base)[1], lat = st_coordinates(nearest_base)[2], zoom = 12)
     }
   })

@@ -1,0 +1,12 @@
+name: RescueRoute
+title: RescueRoute
+username: sofiemosegaard
+account: sofiemosegaard
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 12111770
+bundleId: 8690367
+url: https://sofiemosegaard.shinyapps.io/RescueRoute/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE
