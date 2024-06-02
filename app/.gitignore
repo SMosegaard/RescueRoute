@@ -1,0 +1,6 @@
+# History files
+.Rhistory
+.Rapp.history
+
+# R Environment Variables (i.e., Mapbox token)
+.Renviron
