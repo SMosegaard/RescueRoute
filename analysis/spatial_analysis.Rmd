@@ -3,7 +3,6 @@ title: "Spatial Analysis"
 author: "Sofie Mosegaard"
 ---
 
-
 ### Load Packages ### 
 
 # Packages
@@ -15,16 +14,17 @@ pacman::p_load(mapboxapi,
                mapview,
                ggplot2,
                opencage,
-               mapboxapi)
+               webshot)
+webshot::install_phantomjs(force = TRUE)  # Needed for saving images
 ```
 
 # Connect to MapboxAPI and Opencage API
 ```{r}
 
-mb_token <- "MY TOKEN"
+mb_token <- "MY_TOKEN"
 mb_access_token(mb_token, install = TRUE, overwrite = TRUE)
 
-Sys.setenv(OPENCAGE_KEY = "YOUR KEY")
+Sys.setenv(OPENCAGE_KEY = "MY_TOKEN")
 
 ```
 
@@ -44,7 +44,6 @@ mapbox_map <- leaflet() %>%
 ```{r}
 municipalities <- readRDS("../data/municipalities.rds")
 ```
-
 
 ### Generate Data ### 
 
@@ -120,8 +119,7 @@ hovedstad_bases_df <- oc_forward_df(placename = hovedstad_bases,
 
 ```
 
-# Forward the geocodings to latitude and longitude tuples and save the
-dataframes in.csv format in the 'data' folder.
+# Combine the tuples and save the dataframes in.csv format in the 'data' folder.
 ```{r}
 
 all_hospitals_before <- rbind(nord_hospitals_df,
@@ -158,24 +156,27 @@ write_csv(all_bases, "../data/all_bases.csv")
 # Inspect map of all hospitals before and after the centralization, as well as all ambulance bases
 ```{r}
 
-leaflet() %>% 
+hospitals_before <- leaflet() %>% 
   addTiles() %>% 
   addMarkers(all_hospitals_before$oc_lng,
              all_hospitals_before$oc_lat,
              popup = all_hospitals_before$oc_formatted)
 
-leaflet() %>% 
+hospitals_after <- leaflet() %>% 
   addTiles() %>% 
   addMarkers(all_hospitals_after$oc_lng,
              all_hospitals_after$oc_lat,
              popup = all_hospitals_after$oc_formatted)
 
-leaflet() %>% 
+bases <- leaflet() %>% 
   addTiles() %>% 
   addMarkers(all_bases$oc_lng,
              all_bases$oc_lat,
              popup = all_bases$oc_formatted)
 
+mapshot(hospitals_before, file = "visualizations/leaftlet_hospitals_before.png")
+mapshot(hospitals_after, file = "visualizations/leaflet_hospitals_after.png")
+mapshot(bases, file = "visualizations/leaflet_bases.png")
 ```
 
 
@@ -246,7 +247,7 @@ all_hospitals_after_iso_15 <- mb_isochrone(all_hospitals_after_sf,
                              id = "placename")
 
 write_sf(all_hospitals_after_iso_15, "../data/isochrones/all_hospitals_after_iso_15.shp")
-#all_hospitals_iso_15 <- read_sf("../data/isochrones/all_hospitals_after_iso_15.shp")
+#all_hospitals_after_iso_15 <- read_sf("../data/isochrones/all_hospitals_after_iso_15.shp")
 
 ```
 
@@ -283,66 +284,79 @@ write_sf(all_bases_iso_15, "../data/isochrones/all_bases_iso_15.shp")
 # Inspect continious drive-time around all hospitals in Denmark before and after the centralization
 ```{r}
 
-pal <- colorNumeric("viridis", all_hospitals_before_continious_iso$time, na.color = "transparent")
+# Define the color palettes
+pal_before <- colorNumeric("viridis", all_hospitals_before_continious_iso$time,
+                           na.color = "transparent")
+pal_after <- colorNumeric("viridis", all_hospitals_after_continious_iso$time,
+                          na.color = "transparent")
+pal_bases <- colorNumeric("viridis", all_bases_continious_iso$time,
+                          na.color = "transparent")
 
-mapbox_map %>%
+# Define maps
+
+hospitals_before_continious_iso <- mapbox_map %>%
   addPolygons(data = all_hospitals_before_continious_iso,
               stroke = FALSE,
-              fillColor = ~pal(time),
+              fillColor = ~pal_before(time),
               fillOpacity = 0.1) %>%
   addLegend(values = all_hospitals_before_continious_iso$time,
-            pal = pal,
+            pal = pal_before,
             title = "Drive-time to hospitals before centralization")
 
-
-pal <- colorNumeric("viridis", all_hospitals_after_continious_iso$time, na.color = "transparent")
-
-mapbox_map %>%
+hospitals_after_continious_iso <- mapbox_map %>%
   addPolygons(data = all_hospitals_after_continious_iso,
               stroke = FALSE,
-              fillColor = ~pal(time),
+              fillColor = ~pal_after(time),
               fillOpacity = 0.1) %>%
   addLegend(values = all_hospitals_after_continious_iso$time,
-            pal = pal,
+            pal = pal_after,
             title = "Drive-time to hospitals after centralization")
 
-
-pal <- colorNumeric("viridis", all_bases_continious_iso$time, na.color = "transparent")
-
-mapbox_map %>%
+bases_continious_iso <- mapbox_map %>%
   addPolygons(data = all_bases_continious_iso,
               stroke = FALSE,
-              fillColor = ~pal(time),
+              fillColor = ~pal_bases(time),
               fillOpacity = 0.1) %>%
   addLegend(values = all_bases_continious_iso$time,
-            pal = pal,
+            pal = pal_bases,
             title = "Drive-time to ambulance bases")
+
+mapshot(hospitals_before_continious_iso, file = "visualizations/hospitals_before_drive.png")
+mapshot(hospitals_after_continious_iso, file = "visualizations/hospitals_after_drive.png")
+mapshot(bases_continious_iso, file = "visualizations/bases_drive.png")
 ```
 
 # Inspect regions by municipality
 ```{r}
-municipalities %>% 
+municipalities <- municipalities %>% 
   mapview(zcol = "NAME_1")
+
+mapshot(municipalities, file = "visualizations/municipalities.png")
 ```
 
 
 ### Risk assessment ###
 
 # Identify risk areas outside the isochrones of 30-min drive-time to hospitals (before and after)
+
 ```{r}
 all_hospitals_before_union_30 <- municipalities %>%
   st_union() %>%
   st_difference(st_union(all_hospitals_before_iso_30))
 
-plot(st_geometry(municipalities))
-plot(st_geometry(all_hospitals_before_union_30), add = TRUE, col = "red", alpha = 0.5)
+png(filename = "visualizations/risk_areas_30hospitals.png", width = 800, height = 600)
+plot(st_geometry(municipalities), main = "30-min iso")
+plot(st_geometry(all_hospitals_before_union_30), add = TRUE, col = adjustcolor("red", alpha.f = 0.5))
+dev.off()
 
 all_hospitals_after_union_30 <- municipalities %>%
   st_union() %>%
   st_difference(st_union(all_hospitals_after_iso_30))
 
-plot(st_geometry(municipalities))
-plot(st_geometry(all_hospitals_after_union_30), add = TRUE, col = "red", alpha = 0.5)
+png(filename = "visualizations/risk_areas_after_30hospitals.png", width = 800, height = 600)
+plot(st_geometry(municipalities), main = "after centralization, 30-min iso")
+plot(st_geometry(all_hospitals_after_union_30), add = TRUE, col = adjustcolor("red", alpha.f = 0.5))
+dev.off()
 ```
 
 # Assess new risk areas that have emerged after centralization
@@ -352,7 +366,7 @@ new_risk_areas_hospitals_30 <- st_difference(all_hospitals_after_union_30, all_h
 
 ```{r}
 
-ggplot() +
+risk_zones_30_post_centralization <- ggplot() +
   geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
   geom_sf(data = new_risk_areas_hospitals_30, fill = "red", color = NA, alpha = 1) +
   theme_minimal() +
@@ -362,6 +376,10 @@ ggplot() +
   labs(
     title = "Regions Beyond 30-Minute Drive to Hospital Post Centralization",
     subtitle = "New Risk Zones Identified")
+
+ggsave(filename = "visualizations/risk_zones_30_post_centralization.png",
+       plot = risk_zones_30_post_centralization,
+       width = 10, height = 8, dpi = 300, bg = "white")
 ```
 
 # Identify risk areas outside the isochrones of 15-min drive-time to hospitals (before and after)
@@ -370,15 +388,19 @@ all_hospitals_before_union_15 <- municipalities %>%
   st_union() %>%
   st_difference(st_union(all_hospitals_before_iso_15))
 
-plot(st_geometry(municipalities))
-plot(st_geometry(all_hospitals_before_union_15), add = TRUE, col = "red", alpha = 0.5)
+png(filename = "visualizations/risk_areas_before_15hospitals.png", width = 800, height = 600)
+plot(st_geometry(municipalities), main = "before centralization, 15-min iso")
+plot(st_geometry(all_hospitals_before_union_15), add = TRUE, col = adjustcolor("red", alpha.f = 0.5))
+dev.off()
 
 all_hospitals_after_union_15 <- municipalities %>%
   st_union() %>%
   st_difference(st_union(all_hospitals_after_iso_15))
 
-plot(st_geometry(municipalities))
-plot(st_geometry(all_hospitals_after_union_15), add = TRUE, col = "red", alpha = 0.5)
+png(filename = "visualizations/risk_areas_after_15hospitals.png", width = 800, height = 600)
+plot(st_geometry(municipalities), main = "after centralization, 15-min iso")
+plot(st_geometry(all_hospitals_after_union_15), add = TRUE, col = adjustcolor("red", alpha.f = 0.5))
+dev.off()
 ```
 
 # Assess new risk areas that have emerged after centralization
@@ -388,7 +410,7 @@ new_risk_areas_hospitals_15 <- st_difference(all_hospitals_after_union_15, all_h
 
 ```{r}
 
-ggplot() +
+risk_zones_15_post_centralization <- ggplot() +
   geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
   geom_sf(data = new_risk_areas_hospitals_15, fill = "red", color = NA, alpha = 1) +
   theme_minimal() +
@@ -399,10 +421,16 @@ ggplot() +
     title = "Regions Beyond 15-Minute Drive to Hospital Post Centralization",
     subtitle = "New Risk Zones Identified")
 
+ggsave(filename = "visualizations/risk_zones_15_post_centralization.png",
+       plot = risk_zones_15_post_centralization,
+       width = 10, height = 8, dpi = 300, bg = "white")
+
 ```
 
 # Identify risk areas outside the isochrones of 30-min drive-time to both ambulance bases and hotpitals
 ```{r}
+
+all_bases_iso_30 <- st_make_valid(all_bases_iso_30)
 
 all_bases_30_union <- municipalities %>%
   st_union() %>%
@@ -412,7 +440,7 @@ risk_areas_30 <- st_intersection(all_hospitals_after_union_30, all_bases_30_unio
 ```
 
 ```{r}
-ggplot() +
+risk_zones_30 <- ggplot() +
   geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
   geom_sf(data = risk_areas_30, fill = "red", color = NA, alpha = 1) +
   theme_minimal() +
@@ -424,6 +452,11 @@ ggplot() +
     title = "Risk Areas Outside 30-Minute Drive from Hospital or Ambulance Base",
     subtitle = "Identified Risk Zones"
   )
+
+ggsave(filename = "visualizations/risk_zones_30.png",
+       plot = risk_zones_30,
+       width = 10, height = 8, dpi = 300, bg = "white")
+
 ```
 
 # Identify risk areas outside the isochrones of 15-min drive-time to both ambulance bases and hotpitals
@@ -440,7 +473,7 @@ risk_areas_15 <- st_intersection(all_hospitals_after_union_15, all_bases_15_unio
 ```
 
 ```{r}
-ggplot() +
+risk_zones_15 <- ggplot() +
   geom_sf(data = municipalities, fill = "white", color = "black", size = 0.2) +
   geom_sf(data = risk_areas_15, fill = "red", color = NA, alpha = 1) +
   theme_minimal() +
@@ -452,14 +485,10 @@ ggplot() +
     title = "Risk Areas Outside 15-Minute Drive from Hospital or Ambulance Base",
     subtitle = "Identified Risk Zones"
   )
+
+ggsave(filename = "visualizations/risk_zones_15.png",
+       plot = risk_zones_30,
+       width = 10, height = 8, dpi = 300, bg = "white")
 ```
-
-
-
-
-
-
-
-
 
 
