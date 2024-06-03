@@ -1,10 +1,5 @@
 # RescueRoute
 
-### Spatial Analytics, Cultural Data Science
-
-Sofie Nørbo Mosegaard
-10th of June, 2024
-
 ## 1. The RescueRoute Application
 
 This repository contains the exam project in the course 'Spatial Analytics' for the elective 'Cultural Data Science' at Aarhus University. Specifically, it contains the [RescueRoute application](https://sofiemosegaard.shinyapps.io/RescueRoute/).
