@@ -30,8 +30,9 @@ all_hospitals_sf <- st_as_sf(all_hospitals, coords = c("oc_lng", "oc_lat"),
                              crs = 4326)
 
 
-####### Predefine variables ####### 
+####### Predefined variables ####### 
 
+# Define icons using 'fontawesome'
 icons <- awesomeIconList(
   "Ambulance" = makeAwesomeIcon(
     icon = "ambulance",
@@ -47,8 +48,6 @@ icons <- awesomeIconList(
   )
 )
 
-#fa-h-square
-#fa-ambulance
 
 # Define text and spinner for waiting screen
 text_for_waiting_screen <- data.frame(text = "RescueRoute") 
@@ -181,6 +180,7 @@ server <- function(input, output) {
     
     
     if (!is.null(route_to_user) && !is.null(route_to_hospital)) {
+      
       # Calculate estimated drive time based on distance and constant speed of 50 km/h
       # drive-time in minutes
       est_drive_time_user <- round(distances_bases[nearest_base_index] / 1000 / 50 * 60)
@@ -210,7 +210,8 @@ server <- function(input, output) {
   })
 }
 
-####### Run #######
+
+####### Run the application #######
 
 shinyApp(ui = ui, server = server)
 
