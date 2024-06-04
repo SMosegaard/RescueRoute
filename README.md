@@ -20,9 +20,9 @@ This repository contains the following key components:
 
 |Folder name|Description|Content|
 |---|---|---|
-|analysis|data preparation, preprocessing, and risk assesment analysis |```spatial_analysis.Rmd```, ```Visualizaitions``` folder|
-|app|RescueRoute application and related files|```app.R```, ```RescueRoute-recording.gif```, ```data``` folder|
-|data|Datasets and isochrones|```all_bases.csv```, ```all_hospitals.csv```, ```all_hospitals_before.csv```, ```municipalitied.rsd```, ```isochrones``` folder|
+|analysis|data preparation, preprocessing, and risk assesment analysis |`spatial_analysis.Rmd`, `Visualizaitions` folder|
+|app|RescueRoute application and related files|`app.R`, `RescueRoute-recording.gif`, `data` folder|
+|data|Datasets and isochrones|`all_bases.csv`, `all_hospitals.csv`, `all_hospitals_before.csv`, `municipalitied.rsd`, `isochrones` folder|
 
 ## 3. Reproducibility 
 
